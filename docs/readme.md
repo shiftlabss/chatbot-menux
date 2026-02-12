@@ -70,8 +70,6 @@ O Agente recebe os itens filtrados e gera a resposta em linguagem natural, usand
 
 ## Diagrama de Sequência (Saudação)
 
-![Diagrama de Sequência Saudação](diagrama_menux2.png)
-
 ```mermaid
 sequenceDiagram
     actor User
@@ -88,8 +86,6 @@ sequenceDiagram
 ```
 
 ## Diagrama de Sequência (Pedido)
-
-![Diagrama de Sequência Pedido](diagrama_menux.png)
 
 ```mermaid
 sequenceDiagram
