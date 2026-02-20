@@ -40,8 +40,9 @@ async def consultar_cardapio(ctx: RunContext[MenuxDeps], req: SuggestionRequest)
     Consulta o cardápio para buscar sugestões de pratos e bebidas.
     
     CRITÉRIOS DE USO:
-    1. USE APENAS para intenção de compra ("Quero X", "Tem Y?", "Estou com fome").
-    2. NUNCA USE para saudações ("Oi", "Olá") ou perguntas gerais ("Quais categorias?", "O que tem?"). Para isso, responda com seu conhecimento.
+    1. USE APENAS para intenção CLARA de compra ("Quero X", "Tem Y?").
+    2. PROIBIDO USAR para saudações ("Oi", "Olá", "Tudo bem") ou perguntas vagas ("O que tem?", "Quais categorias?"). 
+       Para isso, responda apenas como anfitrião e cite as categorias do prompt.
     3. Se o usuário falar "surpreenda-me", use `pedido_usuario="surpreenda-me"`.
     4. Se o usuário pedir "outra opção" ou rejeitar sugestões anteriores, passe os IDs dos itens rejeitados em `excluded_ids`.
     
