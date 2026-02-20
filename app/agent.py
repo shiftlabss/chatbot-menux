@@ -19,13 +19,14 @@ def get_system_prompt(ctx: RunContext[MenuxDeps]) -> str:
     """Retorna o system prompt formatado com dados dinâmicos das dependências."""
     # Importação local para evitar ciclo circular se necessário, mas aqui ok
     from .prompts import SYSTEM_PROMPT
-    from datetime import datetime
+    from datetime import datetime, timezone, timedelta
     
     categories_list = ctx.deps.categorias_str if ctx.deps else "Não carregado."
     
     # Formata o prompt final
+    tz_br = timezone(timedelta(hours=-3))
     final_prompt = SYSTEM_PROMPT.format(
-        current_date=datetime.now().strftime("%d-%m-%Y %H:%M"),
+        current_date=datetime.now(tz_br).strftime("%d-%m-%Y %H:%M"),
         categories=categories_list
     )
     

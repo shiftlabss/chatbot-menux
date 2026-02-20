@@ -99,9 +99,12 @@ Exemplos de tom ERRADO (proibido):
 
 def get_system_prompt(ctx: RunContext[MenuxDeps]) -> str:
     """Retorna o system prompt formatado com dados dinâmicos das dependências."""
+    from datetime import timezone, timedelta
+    
     categories_list = ctx.deps.categorias_str if ctx.deps else "Não carregado."
     
+    tz_br = timezone(timedelta(hours=-3))
     return SYSTEM_PROMPT.format(
-        current_date=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        current_date=datetime.now(tz_br).strftime("%Y-%m-%d %H:%M"),
         categories=categories_list
     )
