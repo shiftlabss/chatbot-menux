@@ -25,8 +25,9 @@ def get_system_prompt(ctx: RunContext[MenuxDeps]) -> str:
     
     # Formata o prompt final
     tz_br = timezone(timedelta(hours=-3))
+    data_formatada = datetime.now(tz_br).strftime("%d/%m/%Y %H:%M") + " (Formato: Dia/Mês/Ano)"
     final_prompt = SYSTEM_PROMPT.format(
-        current_date=datetime.now(tz_br).strftime("%d-%m-%Y %H:%M"),
+        current_date=data_formatada,
         categories=categories_list
     )
     
