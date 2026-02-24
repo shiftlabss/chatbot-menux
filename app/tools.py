@@ -6,6 +6,10 @@ import numpy as np
 from openai import AsyncOpenAI
 from .models import SuggestionRequest, SuggestionResult, MenuItem, CategoriaProduto
 from .logger import VisualLogger
+from dotenv import load_dotenv
+
+# Carrega Variáveis de Ambiente PRIMEIRO
+load_dotenv()
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:3000/api/v1")
 
