@@ -1,12 +1,13 @@
+from datetime import datetime, timezone, timedelta
 from pydantic_ai import Agent, RunContext
 from dotenv import load_dotenv
+
 from .models import MenuxResponse, SuggestionRequest, SuggestionResult, MenuxDeps
+from .tools import agente_gastronomico, pick_random_items
+from .logger import VisualLogger
+from .prompts import SYSTEM_PROMPT
 
 load_dotenv()
-
-from .tools import agente_gastronomico
-from .logger import VisualLogger
-from .tools import pick_random_items, SuggestionResult
 
 menux_agent = Agent(
     'openai:gpt-4o-mini',
@@ -17,9 +18,6 @@ menux_agent = Agent(
 @menux_agent.system_prompt
 def get_system_prompt(ctx: RunContext[MenuxDeps]) -> str:
     """Retorna o system prompt formatado com dados dinâmicos das dependências."""
-    # Importação local para evitar ciclo circular se necessário, mas aqui ok
-    from .prompts import SYSTEM_PROMPT
-    from datetime import datetime, timezone, timedelta
     
     categories_list = ctx.deps.categorias_str if ctx.deps else "Não carregado."
     
@@ -45,8 +43,7 @@ async def consultar_cardapio(ctx: RunContext[MenuxDeps], req: SuggestionRequest)
     1. USE APENAS para intenção CLARA de compra ("Quero X", "Tem Y?").
     2. PROIBIDO USAR para saudações ("Oi", "Olá", "Tudo bem") ou perguntas vagas ("O que tem?", "Quais categorias?"). 
        Para isso, responda apenas como anfitrião e cite as categorias do prompt.
-    3. Se o usuário falar "surpreenda-me", use `pedido_usuario="surpreenda-me"`.
-    4. Se o usuário pedir "outra opção" ou rejeitar sugestões anteriores, passe os IDs dos itens rejeitados em `excluded_ids`.
+    3. Se o usuário pedir "outra opção" ou rejeitar sugestões anteriores, passe os IDs dos itens rejeitados em `excluded_ids`.
     
     AVISO CRÍTICO:
     - Esta função deve ser chamada APENAS UMA VEZ por turno.
@@ -59,8 +56,8 @@ async def consultar_cardapio(ctx: RunContext[MenuxDeps], req: SuggestionRequest)
 @menux_agent.tool
 async def surpreenda_me(ctx: RunContext[MenuxDeps], req: SuggestionRequest) -> SuggestionResult:
     """
-    Use esta ferramenta APENAS quando o usuário der LIBERDADE TOTAL ou pedir para SER SURPREENDIDO.
-    Exemplos: "Escolha você", "Qualquer coisa serve", "Me surpreenda", "Tanto faz".
+    Use esta ferramenta APENAS quando o usuário der LIBERDADE TOTAL ou pedir explicitamente para SER SURPREENDIDO.
+    Exemplos: "Escolha você", "Qualquer coisa serve", "Me surpreenda".
     
     Esta tool escolhe itens ALEATÓRIOS do cardápio.
      NÃO use se o usuário tiver intenção clara de busca (ex: "Quero algo com carne").

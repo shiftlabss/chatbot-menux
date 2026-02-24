@@ -10,9 +10,13 @@ from dotenv import load_dotenv
 
 from contextlib import asynccontextmanager
 
-from app.memory import RedisMemory
+import uuid
+from datetime import datetime
 
-# ... (existing imports)
+from app.memory import RedisMemory
+from app.tools import CACHE_MENU_EMBEDDINGS
+from app.upsell import UpsellManager
+from pydantic_ai.messages import ModelResponse, TextPart
 
 # 2. Estado Global (Cache de Contexto)
 class APIState:
@@ -67,8 +71,6 @@ async def chat(request: ChatRequest):
     
     session_id = request.session_id # Ou criar um se não vier (mas idealmente o front deve mandar)
     if not session_id:
-        # Fallback simples: criar um UUID novo se não vier
-        import uuid
         session_id = str(uuid.uuid4())
 
     try:
@@ -82,11 +84,6 @@ async def chat(request: ChatRequest):
             message_history=history
         )
         
-        # 3. Lógica de Upsell Determinístico
-        from app.tools import CACHE_MENU_EMBEDDINGS
-        from app.upsell import UpsellManager
-        from pydantic_ai.messages import ModelResponse, TextPart
-        from datetime import datetime
         
         upsell_data = await UpsellManager.check_upsell(
             result.output.ids_recomendados, 
