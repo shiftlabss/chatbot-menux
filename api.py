@@ -3,9 +3,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from app.agent import menux_agent
-from app.models import MenuxDeps, MenuxResponse
-from app.tools import fetch_category_names, refresh_menu_embeddings
 from dotenv import load_dotenv
 
 from contextlib import asynccontextmanager
@@ -17,6 +14,9 @@ from app.memory import RedisMemory
 from app.tools import CACHE_MENU_EMBEDDINGS
 from app.upsell import UpsellManager
 from pydantic_ai.messages import ModelResponse, TextPart
+from app.agent import menux_agent
+from app.models import MenuxDeps, MenuxResponse
+from app.tools import fetch_category_names, refresh_menu_embeddings
 
 # 2. Estado Global (Cache de Contexto)
 class APIState:
