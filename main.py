@@ -31,7 +31,7 @@ async def main():
     while True:
         user_input = input("Você: ")
         
-        if user_input.lower() in ["sair", "exit"]:
+        if user_input.lower() == "sair":
             break
             
         try:
