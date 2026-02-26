@@ -12,15 +12,18 @@ load_dotenv()
 async def main():
     print("--- Menux (Python/PydanticAI) ---")
     
+    # Recebe o ID do restaurante para teste local
+    restaurant_id = input("Digite o ID do restaurante (ou Enter para 'test-rest-1'): ") or "test-rest-1"
+    
     # Pre-loading de contexto
-    print("🤖 Carregando categorias do cardápio...")
-    cats_context = await fetch_category_names()
-    deps = MenuxDeps(categorias_str=cats_context)
+    print(f"🤖 Carregando categorias do cardápio para {restaurant_id}...")
+    cats_context = await fetch_category_names(restaurant_id)
+    deps = MenuxDeps(categorias_str=cats_context, restaurantId=restaurant_id)
     print("✅ Categorias Carregadas!")
     
     # Warmup do Cache de Embeddings
     print("🚀 Aquecendo motores (Gerando Embeddings)...")
-    await refresh_menu_embeddings()
+    await refresh_menu_embeddings(restaurant_id)
     
     print("\nDigite 'sair' para encerrar.\n")
     

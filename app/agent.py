@@ -51,7 +51,7 @@ async def consultar_cardapio(ctx: RunContext[MenuxDeps], req: SuggestionRequest)
     - Se vieram itens misturados, FILTRE na sua resposta textual, não chame a tool novamente.
     """
     # vai buscar direto da API. Aqui é só ponte.
-    return await agente_gastronomico(req)
+    return await agente_gastronomico(req, restaurant_id=ctx.deps.restaurantId)
 
 @menux_agent.tool
 async def surpreenda_me(ctx: RunContext[MenuxDeps], req: SuggestionRequest) -> SuggestionResult:
@@ -65,7 +65,7 @@ async def surpreenda_me(ctx: RunContext[MenuxDeps], req: SuggestionRequest) -> S
     
     VisualLogger.log_tool_call("surpreenda_me", req.model_dump())
     
-    items = await pick_random_items(qtd=3, category_focus=req.categoria_foco.value)
+    items = await pick_random_items(qtd=3, category_focus=req.categoria_foco.value, restaurant_id=ctx.deps.restaurantId)
     
     if not items:
         return SuggestionResult(sugestoes=[])

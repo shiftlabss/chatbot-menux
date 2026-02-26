@@ -33,15 +33,7 @@ async def lifespan(app: FastAPI):
     Substitui o antigo @app.on_event("startup").
     """
     print("🤖 Iniciando Menux AI Server...")
-    try:
-        # Carrega o cardápio e gera os embeddings no início
-        cats_context = await fetch_category_names()
-        state.deps.categorias_str = cats_context
-        await refresh_menu_embeddings()
-        print("✅ Servidor pronto e Cardápio carregado!")
-    except Exception as e:
-        print(f"❌ Erro crítico no startup: {e}")
-    
+    # O carregamento do cardápio agora é feito sob demanda por restaurante
     yield  # Aqui a API fica rodando
     
     print("👋 Encerrando Menux AI Server.")
@@ -60,6 +52,7 @@ app.add_middleware(
 # 4. Modelos de Entrada/Saída
 class ChatRequest(BaseModel):
     mensagem: str
+    restaurantId: str
     session_id: Optional[str] = None # Opcional por enquanto, se não vier geramos um uuid
 
 
@@ -77,17 +70,23 @@ async def chat(request: ChatRequest):
         # 1. Carrega histórico do Redis
         history = await memory_client.get_history(session_id)
         
+        # Carrega ou obtém categorias do cache para o restaurantId
+        categorias = await fetch_category_names(request.restaurantId)
+        req_deps = MenuxDeps(categorias_str=categorias, restaurantId=request.restaurantId)
+        
         # 2. Executa o Agente com histórico persistido
         result = await menux_agent.run(
             request.mensagem, 
-            deps=state.deps,
+            deps=req_deps,
             message_history=history
         )
         
+        from app.tools import CACHE_MENU_EMBEDDINGS
+        restaurant_cache = CACHE_MENU_EMBEDDINGS.get(request.restaurantId, {})
         
         upsell_data = await UpsellManager.check_upsell(
             result.output.ids_recomendados, 
-            CACHE_MENU_EMBEDDINGS
+            restaurant_cache
         )
         
         new_msgs = result.new_messages()

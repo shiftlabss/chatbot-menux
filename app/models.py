@@ -6,6 +6,7 @@ from dataclasses import dataclass
 @dataclass
 class MenuxDeps:
     categorias_str: str = ""
+    restaurantId: str = ""
 
 class CategoriaProduto(str, Enum):
     ENTRADAS = "entradas"

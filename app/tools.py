@@ -18,8 +18,9 @@ AUTH_PASSWORD = os.getenv("AUTH_PASSWORD")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Cache de Embeddings (Em Memória)
-# Dict[str_id, Dict[str, Any]] -> armazena item completo + 'embedding'
-CACHE_MENU_EMBEDDINGS: Dict[str, Dict[str, Any]] = {}
+# Dict[restaurant_id, Dict[str_id, Dict[str, Any]]] -> armazena item completo + 'embedding'
+CACHE_MENU_EMBEDDINGS: Dict[str, Dict[str, Dict[str, Any]]] = {}
+CACHE_CATEGORIES: Dict[str, str] = {}
 
 openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
@@ -36,7 +37,7 @@ async def get_access_token() -> Optional[str]:
             print(f"Erro no Login: {e}")
             return None
 
-async def fetch_menu_items() -> List[Dict[str, Any]]:
+async def fetch_menu_items(restaurant_id: str) -> List[Dict[str, Any]]:
     """Busca todos os itens do menu da API, realizando login antes."""
     token = await get_access_token()
     if not token:
@@ -46,22 +47,25 @@ async def fetch_menu_items() -> List[Dict[str, Any]]:
     
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(f"{API_BASE_URL}/menu-items", headers=headers, timeout=10.0)
+            response = await client.get(f"{API_BASE_URL}/menu-items?restaurantId={restaurant_id}", headers=headers, timeout=10.0)
             response.raise_for_status()
             return response.json()
         except Exception as e:
             print(f"Erro na API de Menu: {e}")
             return []
 
-async def fetch_category_names() -> str:
+async def fetch_category_names(restaurant_id: str) -> str:
     """Busca árvore de categorias."""
+    if restaurant_id in CACHE_CATEGORIES:
+        return CACHE_CATEGORIES[restaurant_id]
+
     token = await get_access_token()
     if not token: return "Erro ao carregar categorias."
     
     headers = {"Authorization": f"Bearer {token}"}
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(f"{API_BASE_URL}/categories", headers=headers, timeout=10.0)
+            response = await client.get(f"{API_BASE_URL}/categories?restaurantId={restaurant_id}", headers=headers, timeout=10.0)
             response.raise_for_status()
             data = response.json()
             lines = []
@@ -71,7 +75,9 @@ async def fetch_category_names() -> str:
                 subs = [sub.get("name") for sub in cat.get("subcategories", [])]
                 if subs: lines.append(f"- {name} ({', '.join(subs)})")
                 else: lines.append(f"- {name}")
-            return "\n".join(lines)
+            cats_str = "\n".join(lines)
+            CACHE_CATEGORIES[restaurant_id] = cats_str
+            return cats_str
         except Exception:
             return "Indisponível no momento."
 
@@ -85,12 +91,12 @@ async def get_embedding(text: str) -> List[float]:
         print(f"Erro OpenAI Embedding: {e}")
         return []
 
-async def refresh_menu_embeddings():
+async def refresh_menu_embeddings(restaurant_id: str):
     """Atualiza o cache de embeddings do menu usando Batch Processing (Lote)."""
     global CACHE_MENU_EMBEDDINGS
-    print(f"{VisualLogger.WARNING}🔄 Gerando Embeddings do Cardápio (Batch)...{VisualLogger.ENDC}")
+    print(f"{VisualLogger.WARNING}🔄 Gerando Embeddings do Cardápio (Batch) para {restaurant_id}...{VisualLogger.ENDC}")
     
-    items = await fetch_menu_items()
+    items = await fetch_menu_items(restaurant_id)
     if not items: return
 
     # Prepara lista de textos e mapeamento de IDs
@@ -119,30 +125,35 @@ async def refresh_menu_embeddings():
         # O modelo text-embedding-3-small aceita arrays de strings
         resp = await openai_client.embeddings.create(input=texts_to_embed, model="text-embedding-3-small")
         
+        if restaurant_id not in CACHE_MENU_EMBEDDINGS:
+            CACHE_MENU_EMBEDDINGS[restaurant_id] = {}
+            
         # Mapeia resultados de volta para os itens
         for i, embedding_data in enumerate(resp.data):
             # A ordem de resp.data é garantida ser a mesma de input
             item = valid_items[i]
             item["embedding"] = embedding_data.embedding
-            CACHE_MENU_EMBEDDINGS[item["id"]] = item
+            CACHE_MENU_EMBEDDINGS[restaurant_id][item["id"]] = item
             
-        print(f"{VisualLogger.OKGREEN}✅ {len(CACHE_MENU_EMBEDDINGS)} Embeddings Gerados em 1 Batch!{VisualLogger.ENDC}")
+        print(f"{VisualLogger.OKGREEN}✅ {len(CACHE_MENU_EMBEDDINGS[restaurant_id])} Embeddings Gerados em 1 Batch para {restaurant_id}!{VisualLogger.ENDC}")
         
     except Exception as e:
         print(f"{VisualLogger.FAIL}Erro Batch Embedding: {e}{VisualLogger.ENDC}")
 
-async def pick_random_items(qtd: int = 3, category_focus: str = "todas") -> list[MenuItem]:
+async def pick_random_items(qtd: int = 3, category_focus: str = "todas", restaurant_id: str = "") -> list[MenuItem]:
     """Seleciona itens aleatórios do cache para o modo 'Surpreenda-me'."""
     import random
     
-    if not CACHE_MENU_EMBEDDINGS:
-        await refresh_menu_embeddings()
+    cache_restante = CACHE_MENU_EMBEDDINGS.get(restaurant_id, {})
+    if not cache_restante:
+        await refresh_menu_embeddings(restaurant_id)
+        cache_restante = CACHE_MENU_EMBEDDINGS.get(restaurant_id, {})
         
     candidate_items = []
 
     # 1. Se "todas", pegamos tudo.
     if category_focus.lower() == "todas":
-        candidate_items = list(CACHE_MENU_EMBEDDINGS.values())
+        candidate_items = list(cache_restante.values())
         random.shuffle(candidate_items)
         selected_raw = candidate_items[:qtd]
 
@@ -159,7 +170,7 @@ async def pick_random_items(qtd: int = 3, category_focus: str = "todas") -> list
             selected_raw = candidate_items[:qtd]
         else:
             scored = []
-            for item in CACHE_MENU_EMBEDDINGS.values():
+            for item in cache_restante.values():
                 sim = cosine_similarity(vec_foco, item["embedding"])
                 scored.append((sim, item))
             
@@ -186,14 +197,16 @@ async def pick_random_items(qtd: int = 3, category_focus: str = "todas") -> list
 def cosine_similarity(v1: List[float], v2: List[float]) -> float:
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
-async def agente_gastronomico(req: SuggestionRequest) -> SuggestionResult:
+async def agente_gastronomico(req: SuggestionRequest, restaurant_id: str = "") -> SuggestionResult:
     VisualLogger.log_tool_call("agente_gastronomico", req.model_dump())
     
     # 1. Start Cache se Vazio
-    if not CACHE_MENU_EMBEDDINGS:
-        await refresh_menu_embeddings()
+    cache_restante = CACHE_MENU_EMBEDDINGS.get(restaurant_id, {})
+    if not cache_restante:
+        await refresh_menu_embeddings(restaurant_id)
+        cache_restante = CACHE_MENU_EMBEDDINGS.get(restaurant_id, {})
     
-    if not CACHE_MENU_EMBEDDINGS:
+    if not cache_restante:
         return SuggestionResult(sugestoes=[])
 
     # 2. Vetoriza Query do Usuário
@@ -204,7 +217,7 @@ async def agente_gastronomico(req: SuggestionRequest) -> SuggestionResult:
     scored_items = []
     
     # 3. Busca Vetorial
-    for item_id, item in CACHE_MENU_EMBEDDINGS.items():
+    for item_id, item in cache_restante.items():
         # 0. Filtro de Exclusão (Evitar repetições)
         if req.excluded_ids and item_id in req.excluded_ids:
             continue
