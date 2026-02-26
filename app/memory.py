@@ -23,7 +23,21 @@ class RedisMemory:
         
         try:
             # Reconstrói objetos Pydantic a partir do JSON
-            return msg_list_adapter.validate_json(data)
+            messages = msg_list_adapter.validate_json(data)
+            
+            # Validação de integridade do histórico (recuperação de erros antigos)
+            # Se a primeira mensagem for um ToolReturn sem um ToolCall antes (histórico quebrado legado)
+            if messages:
+                primeiro_tipo = messages[0].__class__.__name__
+                if primeiro_tipo == 'ModelResponse':
+                    part_types = [p.__class__.__name__ for p in getattr(messages[0], 'parts', [])]
+                    # Se a primeira coisa da memória for a resposta de uma tool (legado quebrado)
+                    if 'ToolReturnPart' in part_types:
+                        print(f"⚠️ Histórico corrompido detectado para {session_id}. Limpando memória para evitar crash 400.")
+                        await self.clear_history(session_id)
+                        return []
+                        
+            return messages
         except Exception as e:
             print(f"Erro ao deserializar histórico: {e}")
             return []
