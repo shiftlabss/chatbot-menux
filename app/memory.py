@@ -44,10 +44,25 @@ class RedisMemory:
         # 2. Anexa novos
         updated_history = current_history + new_messages
         
-        # 3. Trunca (Mantém os últimos 8)
-        # Se tiver mais que 8, pega os últimos 8
-        if len(updated_history) > 8:
-            updated_history = updated_history[-8:]
+        # 3. Trunca (Mantém as últimas 8 mensagens de forma segura)
+        # Se cortarmos cegamente os últimos N, podemos separar um ToolReturn de um ToolCall,
+        # o que gera o erro da OpenAI 'messages.[0].role = tool'.
+        max_messages = 8
+        if len(updated_history) > max_messages:
+            safe_idx = len(updated_history) - max_messages
+            # Procura a próxima mensagem segura (ModelRequest do usuário)
+            while safe_idx < len(updated_history):
+                msg = updated_history[safe_idx]
+                # Se for requisição do usuário (ModelRequest)
+                if msg.__class__.__name__ == 'ModelRequest':
+                    part_types = [p.__class__.__name__ for p in getattr(msg, 'parts', [])]
+                    # Paramos se contém a fala do usuário e NÃO for um retorno de tool
+                    if 'UserPromptPart' in part_types and 'ToolReturnPart' not in part_types:
+                        break
+                safe_idx += 1
+            
+            # Corta a partir do índice seguro encontrado
+            updated_history = updated_history[safe_idx:]
             
         # 4. Salva com TTL
         json_data = msg_list_adapter.dump_json(updated_history)
